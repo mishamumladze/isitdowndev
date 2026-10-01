@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String            @id @default(cuid())
+  email            String            @unique
+  createdAt        DateTime          @default(now())
+  services         UserService[]
+  alertPreference  AlertPreference?
+  webhooks         Webhook[]
+  notificationLogs NotificationLog[]
+}
+
+model Service {
+  slug        String        @id
+  name        String
+  category    String
+  statusUrl   String
+  apiUrl      String?
+  docsUrl     String?
+  logo        String?
+  checks      StatusCheck[]
+  incidents   Incident[]
+  subscribers UserService[]
+}
+
+model StatusCheck {
+  id          Int      @id @default(autoincrement())
+  serviceSlug String
+  service     Service  @relation(fields: [serviceSlug], references: [slug], onDelete: Cascade)
+  status      String
+  latencyMs   Int?
+  checkedAt   DateTime @default(now())
+
+  @@index([serviceSlug, checkedAt])
+}
+
+model Incident {
+  id          String    @id @default(cuid())
+  title       String
+  status      String    @default("investigating")
+  severity    String    @default("minor")
+  startedAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+  serviceSlug String
+  service     Service   @relation(fields: [serviceSlug], references: [slug], onDelete: Cascade)
+
+  @@index([serviceSlug, startedAt])
+  @@index([startedAt])
+}
+
+model UserService {
+  userId      String
+  serviceSlug String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service     Service @relation(fields: [serviceSlug], references: [slug], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@id([userId, serviceSlug])
+}
+
+model AlertPreference {
+  userId      String  @id
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  severity    String  @default("major")
+  browserPush Boolean @default(true)
+  updatedAt   DateTime @updatedAt
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider  String
+  url       String
+  events    String   @default("status-change")
+  createdAt DateTime @default(now())
+}
+
+model NotificationLog {
+  id     Int      @id @default(autoincrement())
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type   String
+  payload String
+  sentAt DateTime @default(now())
+
+  @@index([userId, sentAt])
+}
